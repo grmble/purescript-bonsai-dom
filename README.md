@@ -1,5 +1,7 @@
 # Purescript Bonsai DOM
 
+[![Build Status](https://travis-ci.org/grmble/purescript-bonsai-dom.svg?branch=master)](https://travis-ci.org/grmble/purescript-bonsai-dom)
+
 Minimal DOM primitives used by `purescript-bonsai`.
 
 Bonsai programs use Elm's virtual dom, so the
