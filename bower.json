@@ -1,6 +1,6 @@
 {
   "name": "purescript-bonsai-dom",
-  "homepage": "https://github.com/grmble/purescript-bonsai-dom",
+  "homepage": "https://grmble.github.io/purescript-bonsai/",
   "description": "Bonsai DOM primitives",
   "license": "MIT",
   "repository": {
