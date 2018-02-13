@@ -33,6 +33,7 @@ module Bonsai.DOM
   , effF
 
   , appendChild
+  , addEventListener
   , clearElement
   , document
   , elementById
@@ -61,7 +62,7 @@ import Data.Either (Either(..))
 import Data.Foldable (class Foldable, intercalate)
 import Data.Foreign (F, Foreign, ForeignError(..), fail, isNull, isUndefined, readString, renderForeignError)
 import Data.Foreign.Index ((!))
-import Data.Function.Uncurried (Fn1, Fn2, runFn1, runFn2)
+import Data.Function.Uncurried (Fn1, Fn2, Fn4, runFn1, runFn2, runFn4)
 import Data.Newtype (class Newtype, unwrap, wrap)
 
 -- | Effect for conversion to Eff/Aff
@@ -106,6 +107,7 @@ foreign import primitives :: forall eff.
   { window :: Foreign
   , elementById :: Fn2 ElementId Document Foreign
   , appendChild :: Fn2 Element Element Unit
+  , addEventListener :: forall eff. Fn4 ListenerOptions String (Foreign -> Eff (dom::DOM|eff) Unit) Element Unit
   , clearElement :: Fn1 Element Unit
   , copyFakeArray :: Fn1 Foreign (Array Foreign)
   , focusElement :: Fn1 Element Unit
@@ -116,6 +118,18 @@ foreign import primitives :: forall eff.
   , requestAnimationFrame :: Fn2 (Eff eff Unit) Window RequestAnimationFrameId
   }
 
+-- | Event listener options.
+-- |
+-- | * capture: events of this type will be dispatched to this listener first
+-- | * once: will only be invoked once - will be automatically removed
+-- | * passive: the listener will never call preventDefaults().
+-- |   see mdn (scrolling performance)
+type ListenerOptions =
+  { capture :: Boolean
+  , once :: Boolean
+  , passive :: Boolean
+  }
+
 
 -- | Fail the F if the forein value is null or undefined
 failNullOrUndefined :: String -> Foreign -> F Foreign
@@ -124,6 +138,7 @@ failNullOrUndefined msg x =
     then fail $ ForeignError ("null or undefined: " <> msg)
     else pure x
 
+
 -- | Produce an error message for the Left runExcept result
 foreignErrorMsg
   :: forall f
@@ -131,6 +146,7 @@ foreignErrorMsg
   => f ForeignError -> String
 foreignErrorMsg err =
   intercalate ", " $ renderForeignError <$> err
+
 
 -- | Run the F in Eff
 -- |
@@ -142,6 +158,7 @@ effF fa =
       throw $ foreignErrorMsg err
     Right a ->
       pure a
+
 
 -- | Run the F in Aff
 affF :: forall eff a. F a -> Aff (dom::DOM|eff) a
@@ -162,6 +179,7 @@ document (Window w) =
   failNullOrUndefined "element document" >>=
   pure <<< wrap
 
+
 -- | Copy an array-ish object to a real array.
 -- |
 -- | The foreign object needs to have a length property
@@ -170,12 +188,26 @@ copyFakeArray :: Foreign -> F (Array Foreign)
 copyFakeArray =
   pure <<< primitives.copyFakeArray
 
+
 -- | Get the element identified by id.
 elementById :: ElementId -> Document -> F Element
 elementById id doc =
   runFn2 primitives.elementById id doc #
   failNullOrUndefined ("elementById #" <> unwrap id) >>=
   pure <<< wrap
+
+
+
+-- | Add an event listener to an element.
+-- |
+-- | By combining this with issueCommand, you can have external
+-- | elements issue commands to your bonsai program.
+addEventListener
+  :: forall eff
+  . ListenerOptions -> String -> (Foreign -> Eff (dom::DOM|eff) Unit) -> Element -> F Unit
+addEventListener opts event fn elem = do
+  let _ = runFn4 primitives.addEventListener opts event fn elem
+  pure unit
 
 
 -- | Append the child
@@ -187,12 +219,14 @@ appendChild child parent = do
   let _ = runFn2 primitives.appendChild child parent
   pure child
 
+
 -- | Get the documents window
 defaultView :: Document -> F Window
 defaultView (Document doc) =
   doc ! "defaultView" >>=
   failNullOrUndefined "defaultView" >>=
   pure <<< wrap
+
 
 -- | Clear the element.
 -- |
@@ -203,6 +237,7 @@ clearElement elem = do
   let _ = runFn1 primitives.clearElement elem
   pure elem
 
+
 -- | Focus the element.
 -- |
 -- | Returns the element for easy chaining.
@@ -210,6 +245,7 @@ focusElement :: Element -> F Element
 focusElement elem = do
   let _ = runFn1 primitives.focusElement elem
   pure elem
+
 
 -- | The current Location object
 -- |
@@ -220,6 +256,7 @@ location :: Document -> F Foreign
 location (Document doc) =
   doc ! "location"
 
+
 -- | The current location hash
 -- |
 -- | This is a # followed by the fragment of the URL
@@ -229,6 +266,7 @@ locationHash doc = do
   loc <- location doc
   loc ! "hash" >>= readString
 
+
 -- | Set the location fragment.
 -- |
 -- | The string should start with an `#`
@@ -236,6 +274,7 @@ setLocationHash :: String -> Document -> F Unit
 setLocationHash str doc = do
   loc <- location doc
   pure $ runFn2 primitives.setLocationHash str loc
+
 
 -- | Get the first element that matches the selector
 -- |
@@ -245,6 +284,7 @@ querySelector str docOrElem =
   runFn2 primitives.querySelector str docOrElem #
   failNullOrUndefined ("querySelector " <> str) >>=
   pure <<< wrap
+
 
 -- | Get all elements matching the selector.
 -- |
@@ -257,6 +297,7 @@ querySelectorAll str docOrElem =
   copyFakeArray >>=
   pure <<< map Element
 
+
 -- | Select the (input) element's text.
 -- |
 -- | Returns the element for easy chaining.
@@ -264,6 +305,7 @@ selectElementText :: Element -> F Element
 selectElementText elem = do
   let _ = runFn1 primitives.selectElement elem
   pure elem
+
 
 -- | Get the elements text content.
 textContent :: Element -> F String
@@ -276,12 +318,14 @@ innerHTML :: Element -> F String
 innerHTML (Element elem) =
   elem ! "innerHTML" >>= readString
 
+
 -- | The elements document.
 ownerDocument :: Element -> F Document
 ownerDocument (Element elem) =
   elem ! "ownerDocument" >>=
   failNullOrUndefined "element ownerDocument" >>=
   pure <<< wrap
+
 
 -- | Request animation frame.
 requestAnimationFrame :: forall eff. Eff eff Unit -> Window -> F RequestAnimationFrameId

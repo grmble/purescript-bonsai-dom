@@ -19,6 +19,10 @@ exports.primitives =
     return doc.getElementById(id);
   }
 
+, addEventListener: function(opts, evt, listener, elem) {
+    elem.addEventListener(evt, listener, opts);
+  }
+
 , appendChild: function (child, parent) {
     return parent.appendChild(child);
   }
