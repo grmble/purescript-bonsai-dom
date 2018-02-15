@@ -107,7 +107,7 @@ foreign import primitives :: forall eff.
   { window :: Foreign
   , elementById :: Fn2 ElementId Document Foreign
   , appendChild :: Fn2 Element Element Unit
-  , addEventListener :: forall eff. Fn4 ListenerOptions String (Foreign -> Eff (dom::DOM|eff) Unit) Element Unit
+  , addEventListener :: Fn4 ListenerOptions String (Foreign -> Eff (dom::DOM|eff) Unit) Element Unit
   , clearElement :: Fn1 Element Unit
   , copyFakeArray :: Fn1 Foreign (Array Foreign)
   , focusElement :: Fn1 Element Unit
@@ -120,9 +120,9 @@ foreign import primitives :: forall eff.
 
 -- | Event listener options.
 -- |
--- | * capture: events of this type will be dispatched to this listener first
--- | * once: will only be invoked once - will be automatically removed
--- | * passive: the listener will never call preventDefaults().
+-- | * `capture`: events of this type will be dispatched to this listener first
+-- | * `once`: will only be invoked once - will be automatically removed
+-- | * `passive`: the listener will never call preventDefaults().
 -- |   see mdn (scrolling performance)
 type ListenerOptions =
   { capture :: Boolean
