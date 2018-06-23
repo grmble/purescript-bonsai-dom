@@ -9,7 +9,7 @@
 -- |
 -- | This DOM package uses F for the DOM access.
 -- | This is much nicer to work with than some
--- | `Eff eff (Maybe Element)`.  You have to run
+-- | `Effect eff (Maybe Element)`.  You have to run
 -- | the underlying except though, convenience
 -- | helpers `effF` and `affF` are provided.
 -- |
@@ -19,8 +19,7 @@
 -- | take a Window or Document argument instead
 -- | of using a global.
 module Bonsai.DOM
-  ( DOM
-  , Document(..)
+  ( Document(..)
   , Element(..)
   , ElementId(..)
   , Window(..)
@@ -54,19 +53,17 @@ where
 
 import Prelude
 
-import Control.Monad.Aff (Aff, liftEff')
-import Control.Monad.Eff (Eff, kind Effect)
-import Control.Monad.Eff.Exception (EXCEPTION, throw)
 import Control.Monad.Except (runExcept)
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, intercalate)
-import Data.Foreign (F, Foreign, ForeignError(..), fail, isNull, isUndefined, readString, renderForeignError)
-import Data.Foreign.Index ((!))
 import Data.Function.Uncurried (Fn1, Fn2, Fn4, runFn1, runFn2, runFn4)
 import Data.Newtype (class Newtype, unwrap, wrap)
-
--- | Effect for conversion to Eff/Aff
-foreign import data DOM :: Effect
+import Effect (Effect)
+import Effect.Class (liftEffect)
+import Effect.Aff (Aff)
+import Effect.Exception (throw)
+import Foreign (F, Foreign, ForeignError(..), fail, isNull, isUndefined, readString, renderForeignError)
+import Foreign.Index ((!))
 
 
 -- | The type for the global javascript document
@@ -103,11 +100,11 @@ derive instance newtypeRequestAnimationFrameId :: Newtype RequestAnimationFrameI
 
 -- primitive methods from the native module
 -- note that simple property access is done in F - no native code needed
-foreign import primitives :: forall eff.
+foreign import primitives ::
   { window :: Foreign
   , elementById :: Fn2 ElementId Document Foreign
   , appendChild :: Fn2 Element Element Unit
-  , addEventListener :: Fn4 ListenerOptions String (Foreign -> Eff (dom::DOM|eff) Unit) Element Unit
+  , addEventListener :: Fn4 ListenerOptions String (Foreign -> Effect Unit) Element Unit
   , clearElement :: Fn1 Element Unit
   , copyFakeArray :: Fn1 Foreign (Array Foreign)
   , focusElement :: Fn1 Element Unit
@@ -115,7 +112,7 @@ foreign import primitives :: forall eff.
   , setLocationHash :: Fn2 String Foreign Unit
   , querySelector :: Fn2 String Foreign Foreign
   , querySelectorAll :: Fn2 String Foreign Foreign
-  , requestAnimationFrame :: Fn2 (Eff eff Unit) Window RequestAnimationFrameId
+  , requestAnimationFrame :: Fn2 (Effect Unit) Window RequestAnimationFrameId
   }
 
 -- | Event listener options.
@@ -151,7 +148,7 @@ foreignErrorMsg err =
 -- | Run the F in Eff
 -- |
 -- | Errors will be thrown as exception
-effF :: forall eff a. F a -> Eff (dom::DOM,exception::EXCEPTION|eff) a
+effF :: forall a. F a -> Effect a
 effF fa =
   case runExcept fa of
     Left err ->
@@ -161,9 +158,9 @@ effF fa =
 
 
 -- | Run the F in Aff
-affF :: forall eff a. F a -> Aff (dom::DOM|eff) a
+affF :: forall a. F a -> Aff a
 affF fa =
-  liftEff' $ effF fa
+  liftEffect $ effF fa
 
 -- | Get the global javascript Window object
 window :: F Window
@@ -203,8 +200,7 @@ elementById id doc =
 -- | By combining this with issueCommand, you can have external
 -- | elements issue commands to your bonsai program.
 addEventListener
-  :: forall eff
-  . ListenerOptions -> String -> (Foreign -> Eff (dom::DOM|eff) Unit) -> Element -> F Unit
+  :: ListenerOptions -> String -> (Foreign -> Effect Unit) -> Element -> F Unit
 addEventListener opts event fn elem = do
   let _ = runFn4 primitives.addEventListener opts event fn elem
   pure unit
@@ -328,6 +324,6 @@ ownerDocument (Element elem) =
 
 
 -- | Request animation frame.
-requestAnimationFrame :: forall eff. Eff eff Unit -> Window -> F RequestAnimationFrameId
+requestAnimationFrame :: Effect Unit -> Window -> F RequestAnimationFrameId
 requestAnimationFrame eff =
   pure <<< runFn2 primitives.requestAnimationFrame eff
