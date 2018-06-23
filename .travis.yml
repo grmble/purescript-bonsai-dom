@@ -5,5 +5,7 @@ node_js: lts/*
 install:
   - npm install -g bower purescript pulp
 script:
+  - bower install --production
+  - pulp build
   - bower install
   - pulp test
