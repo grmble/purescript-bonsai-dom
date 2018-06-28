@@ -34,6 +34,7 @@ module Bonsai.DOM
   , appendChild
   , addEventListener
   , clearElement
+  , defaultView
   , document
   , elementById
   , focusElement
